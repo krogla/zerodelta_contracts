@@ -59,8 +59,8 @@ interface ZeroDeltaDividendToken {
 contract ZeroDeltaDividendManager {
     using SafeMath for uint256;
 
-    /* Our handle to the UnicornToken contract. */
-    ZeroDeltaDividendToken dividendToken;
+    ZeroDeltaDividendToken public dividendToken;
+    uint256 public retainedEarning;
 
     /* Handle payments we couldn't make. */
     mapping (address => uint256) public pendingWithdrawals;
@@ -80,8 +80,6 @@ contract ZeroDeltaDividendManager {
         dividendToken = _dividendToken;
     }
 
-    uint256 public retainedEarning = 0;
-
     // Makes a dividend payment - we make it available to all senders then send the change back to the caller.  We don't actually send the payments to everyone to reduce gas cost and also to
     // prevent potentially getting into a situation where we have recipients throwing causing dividend failures and having to consolidate their dividends in a separate process.
 
@@ -95,22 +93,17 @@ contract ZeroDeltaDividendManager {
 
         /* Determine how much to pay each shareholder. */
         uint256 totalSupply = dividendToken.totalSupply();
-        uint256 decimalsBase = 10 ** uint256(dividendToken.decimals());
-//        uint256 paymentPerShare = retainedEarning.div(totalSupply);
-        //        require (paymentPerShare > 0); //!!!
-//        if (paymentPerShare > 0) {
-            uint256 totalPaidOut = 0;
-            /* Enum all accounts and send them payment */
-            // внимание! id холдера начинаются с 1!
-            for (uint256 i = 1; i <= dividendToken.holdersCount(); i++) {
-                address holder = dividendToken.holders(i);
-                uint256 withdrawal = retainedEarning.mul(dividendToken.balanceOf(holder)).div(totalSupply).div(decimalsBase);
-                pendingWithdrawals[holder] = pendingWithdrawals[holder].add(withdrawal);
-                emit WithdrawalAvailable(holder, withdrawal);
-                totalPaidOut = totalPaidOut.add(withdrawal);
-            }
-            retainedEarning = retainedEarning.sub(totalPaidOut);
-//        }
+        uint256 totalPaidOut = 0;
+        /* Enum all accounts and send them payment */
+        // внимание! id холдера начинаются с 1!
+        for (uint256 i = 1; i <= dividendToken.holdersCount(); i++) {
+            address holder = dividendToken.holders(i);
+            uint256 withdrawal = retainedEarning.mul(dividendToken.balanceOf(holder)).div(totalSupply);
+            pendingWithdrawals[holder] = pendingWithdrawals[holder].add(withdrawal);
+            emit WithdrawalAvailable(holder, withdrawal);
+            totalPaidOut = totalPaidOut.add(withdrawal);
+        }
+        retainedEarning = retainedEarning.sub(totalPaidOut);
         emit DividendPayment(totalPaidOut);
     }
 
