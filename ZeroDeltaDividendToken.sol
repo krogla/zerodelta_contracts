@@ -49,20 +49,12 @@ library SafeMath {
 }
 
 
-/**
- * @title ERC20
- */
 interface ERC20 {
     function totalSupply() external view returns (uint256);
-
     function balanceOf(address who) external view returns (uint256);
-
     function transfer(address to, uint256 value) external returns (bool);
-
     function allowance(address owner, address spender) external view returns (uint256);
-
     function transferFrom(address from, address to, uint256 value) external returns (bool);
-
     function approve(address spender, uint256 value) external returns (bool);
 }
 
@@ -128,10 +120,8 @@ contract hasHolders {
     function _delHolder(address _holder) internal returns (bool){
         uint id = holdersId[_holder];
         if (id != 0 && holdersCount > 0) {
-            //replace with last
             holders[id] = holders[holdersCount];
             delete holdersId[_holder];
-            //delete last id and decrease count
             delete holders[holdersCount--];
             emit DelHolder(_holder);
             return true;
@@ -142,10 +132,6 @@ contract hasHolders {
 
 /**
  * @title Standard ERC20 token
- *
- * @dev Implementation of the basic standard token.
- * @dev https://github.com/ethereum/EIPs/issues/20
- * @dev Based on code by FirstBlood: https://github.com/Firstbloodio/token/blob/master/smart_contract/FirstBloodToken.sol
  */
 contract StandardTokenWithHolders is hasHolders {
     using SafeMath for uint256;
@@ -165,11 +151,11 @@ contract StandardTokenWithHolders is hasHolders {
         // SafeMath.sub will throw if there is not enough balance.
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);
         balanceOf[_to] = balanceOf[_to].add(_value);
+        emit Transfer(_from, _to, _value);
         _addHolder(_to);
         if (balanceOf[_from] == 0) {
             _delHolder(_from);
         }
-        emit Transfer(_from, _to, _value);
         return true;
     }
 
@@ -255,7 +241,7 @@ contract ZeroDeltaDividendToken is StandardTokenWithHolders, Ownable {
     // Public variables of the token
     string public name = "ZeroDelta Dividend Token";
     string public symbol = "ZDDT";
-    uint8 public decimals = 18; //equal to Ether, it's simpler
+    uint8 public decimals = 18;
 
     constructor () public {
         totalSupply = 100 * (10 ** uint256(decimals));
