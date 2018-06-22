@@ -435,12 +435,10 @@ contract MintableBurnableTokenWithAgents is MintableBurnableToken {
 }
 
 
-contract OrangeDucat is MintableBurnableTokenWithAgents {
-    // Public variables of the token
-    string public name = "Orange Ducat";
-    //  string public symbol = "ORD";
-    string public symbol = "🍊RNG";
-    uint8 public decimals = 18; //equal to Ether, it's simpler
+contract ZeroDeltaToken is MintableBurnableTokenWithAgents {
+    string public name = "ZeroDelta Token";
+    string public symbol = "ZDT";
+    uint8 public decimals = 18;
 
     constructor (uint _supply) public {
         mint(owner, _supply * (10 ** uint256(decimals)));

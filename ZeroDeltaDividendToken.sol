@@ -54,10 +54,15 @@ library SafeMath {
  */
 interface ERC20 {
     function totalSupply() external view returns (uint256);
+
     function balanceOf(address who) external view returns (uint256);
+
     function transfer(address to, uint256 value) external returns (bool);
+
     function allowance(address owner, address spender) external view returns (uint256);
+
     function transferFrom(address from, address to, uint256 value) external returns (bool);
+
     function approve(address spender, uint256 value) external returns (bool);
 }
 
@@ -96,9 +101,44 @@ contract Ownable {
         owner = _newOwner;
         emit OwnershipTransferred(owner, _newOwner);
     }
-
 }
 
+
+contract hasHolders {
+    mapping(address => uint) public holdersId;
+    // holder id starts at 1
+    mapping(uint => address) public holders;
+    uint public holdersCount = 0;
+
+    event AddHolder(address indexed holder);
+    event DelHolder(address indexed holder);
+
+    // add new token holder
+    function _addHolder(address _holder) internal returns (bool) {
+        if (holdersId[_holder] == 0) {
+            holdersId[_holder] = ++holdersCount;
+            holders[holdersCount] = _holder;
+            emit AddHolder(_holder);
+            return true;
+        }
+        return false;
+    }
+
+    // delete token holder
+    function _delHolder(address _holder) internal returns (bool){
+        uint id = holdersId[_holder];
+        if (id != 0 && holdersCount > 0) {
+            //replace with last
+            holders[id] = holders[holdersCount];
+            delete holdersId[_holder];
+            //delete last id and decrease count
+            delete holders[holdersCount--];
+            emit DelHolder(_holder);
+            return true;
+        }
+        return false;
+    }
+}
 
 /**
  * @title Standard ERC20 token
@@ -107,7 +147,7 @@ contract Ownable {
  * @dev https://github.com/ethereum/EIPs/issues/20
  * @dev Based on code by FirstBlood: https://github.com/Firstbloodio/token/blob/master/smart_contract/FirstBloodToken.sol
  */
-contract StandardToken {
+contract StandardTokenWithHolders is hasHolders {
     using SafeMath for uint256;
 
     uint256 public totalSupply;
@@ -117,20 +157,31 @@ contract StandardToken {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
+
+    function _transfer(address _from, address _to, uint256 _value) internal returns (bool) {
+        require(_to != address(0));
+        require(_value > 0 && _value <= balanceOf[_from]);
+
+        // SafeMath.sub will throw if there is not enough balance.
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);
+        balanceOf[_to] = balanceOf[_to].add(_value);
+        _addHolder(_to);
+        if (balanceOf[_from] == 0) {
+            _delHolder(_from);
+        }
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
     /**
     * @dev transfer token for a specified address
     * @param _to The address to transfer to.
     * @param _value The amount to be transferred.
     */
-    function transfer(address _to, uint256 _value) whenNotPaused public returns (bool) {
-        require(_to != address(0));
-        require(_value <= balanceOf[msg.sender]);
-
-        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);
-        balanceOf[_to] = balanceOf[_to].add(_value);
-        emit Transfer(msg.sender, _to, _value);
-        return true;
+    function transfer(address _to, uint256 _value) public returns (bool) {
+        return _transfer(msg.sender, _to, _value);
     }
+
 
     /**
      * @dev Transfer tokens from one address to another
@@ -138,16 +189,10 @@ contract StandardToken {
      * @param _to address The address which you want to transfer to
      * @param _value uint256 the amount of tokens to be transferred
      */
-    function transferFrom(address _from, address _to, uint256 _value) whenNotPaused public returns (bool) {
-        require(_to != address(0));
-        require(_value <= balanceOf[_from]);
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
         require(_value <= allowance[_from][msg.sender]);
-
-        balanceOf[_from] = balanceOf[_from].sub(_value);
-        balanceOf[_to] = balanceOf[_to].add(_value);
         allowance[_from][msg.sender] = allowance[_from][msg.sender].sub(_value);
-        emit Transfer(_from, _to, _value);
-        return true;
+        return _transfer(_from, _to, _value);
     }
 
     /**
@@ -160,7 +205,7 @@ contract StandardToken {
      * @param _spender The address which will spend the funds.
      * @param _value The amount of tokens to be spent.
      */
-    function approve(address _spender, uint256 _value) whenNotPaused public returns (bool) {
+    function approve(address _spender, uint256 _value) public returns (bool) {
         allowance[msg.sender][_spender] = _value;
         emit Approval(msg.sender, _spender, _value);
         return true;
@@ -176,7 +221,7 @@ contract StandardToken {
      * @param _spender The address which will spend the funds.
      * @param _addedValue The amount of tokens to increase the allowance by.
      */
-    function increaseApproval(address _spender, uint _addedValue) whenNotPaused public returns (bool) {
+    function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
         allowance[msg.sender][_spender] = (
         allowance[msg.sender][_spender].add(_addedValue));
         emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
@@ -193,7 +238,7 @@ contract StandardToken {
      * @param _spender The address which will spend the funds.
      * @param _subtractedValue The amount of tokens to decrease the allowance by.
      */
-    function decreaseApproval(address _spender, uint _subtractedValue) whenNotPaused public returns (bool)
+    function decreaseApproval(address _spender, uint _subtractedValue) public returns (bool)
     {
         uint oldValue = allowance[msg.sender][_spender];
         if (_subtractedValue > oldValue) {
@@ -204,35 +249,19 @@ contract StandardToken {
         emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
         return true;
     }
-
 }
 
-contract ZeroDeltaDividendToken is StandardToken {
+contract ZeroDeltaDividendToken is StandardTokenWithHolders, Ownable {
     // Public variables of the token
     string public name = "ZeroDelta Dividend Token";
     string public symbol = "ZDDT";
     uint8 public decimals = 18; //equal to Ether, it's simpler
 
-    constructor (uint _supply) public {
-        mint(owner, _supply * (10 ** uint256(decimals)));
-    }
-
-    /**
-     * @dev Disallows direct send by settings a default function without the `payable` flag.
-     */
-    function() external {}
-
-    /**
-     * @dev Reject all ERC223 compatible tokens
-     * @param from_ address The address that is transferring the tokens
-     * @param value_ uint256 the amount of the specified token
-     * @param data_ Bytes The data passed from the caller.
-     */
-    function tokenFallback(address from_, uint256 value_, bytes data_) pure external {
-        from_;
-        value_;
-        data_;
-        revert();
+    constructor () public {
+        totalSupply = 100 * (10 ** uint256(decimals));
+        balanceOf[owner] = totalSupply;
+        emit Transfer(address(0), owner, totalSupply);
+        _addHolder(owner);
     }
 
     /**
@@ -251,4 +280,5 @@ contract ZeroDeltaDividendToken is StandardToken {
         token.transfer(owner, balance);
     }
 }
+
 
