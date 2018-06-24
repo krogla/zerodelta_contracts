@@ -80,6 +80,13 @@ contract ZeroDeltaDividendToken is Ownable {
     Checkpoint[] totalSupplyHistory;
 
     ////////////////
+    // Events
+    ////////////////
+    event ClaimedTokens(address indexed _token, address indexed _owner, uint _amount);
+    event Transfer(address indexed _from, address indexed _to, uint256 _amount);
+    event Approval(address indexed _owner, address indexed _spender, uint256 _amount);
+
+    ////////////////
     // Constructor
     ////////////////
 
@@ -401,13 +408,5 @@ contract ZeroDeltaDividendToken is Ownable {
         token.transfer(owner, balance);
         emit ClaimedTokens(_token, owner, balance);
     }
-
-    ////////////////
-    // Events
-    ////////////////
-    event ClaimedTokens(address indexed _token, address indexed _owner, uint _amount);
-    event Transfer(address indexed _from, address indexed _to, uint256 _amount);
-    event Approval(address indexed _owner, address indexed _spender, uint256 _amount);
-
 }
 
