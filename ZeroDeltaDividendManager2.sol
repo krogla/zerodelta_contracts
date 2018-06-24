@@ -82,8 +82,6 @@ interface ZeroDeltaDividendToken {
     function allowance(address owner, address spender) external view returns (uint256);
     function transferFrom(address from, address to, uint256 value) external returns (bool);
     function approve(address spender, uint256 value) external returns (bool);
-    function holders(uint256) external view returns (address);
-    function holdersCount() external view returns (uint256);
 
     function totalSupplyAt(uint _blockNumber) external view  returns(uint);
     function balanceOfAt(address _owner, uint _blockNumber) external view returns (uint);

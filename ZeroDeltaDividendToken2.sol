@@ -95,10 +95,7 @@ contract ZeroDeltaDividendToken is Ownable {
     /// @param _parentSnapShotBlock Block of the parent token that will
     ///  determine the initial distribution of the clone token, set to 0 if it
     ///  is a new token
-    constructor (
-        address _parentToken,
-        uint _parentSnapShotBlock
-    ) public {
+    constructor (address _parentToken, uint _parentSnapShotBlock) public {
         name = "ZeroDelta Dividend Token";
         symbol = "ZDDT";
         decimals = 18;
