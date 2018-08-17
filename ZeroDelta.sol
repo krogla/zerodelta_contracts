@@ -1,54 +1,56 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.24;
 
 
 /**
- * @title SafeMath
+ * @title SafeMath v0.1.9
  * @dev Math operations with safety checks that throw on error
+ * change notes:  original SafeMath library from OpenZeppelin modified by Inventor
+ * - changed asserts to requires with error log outputs
+ * - removed div, its useless
  */
 library SafeMath {
 
     /**
     * @dev Multiplies two numbers, throws on overflow.
     */
-    function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
+    function mul(uint256 a, uint256 b)
+    internal
+    pure
+    returns (uint256 c)
+    {
         if (a == 0) {
             return 0;
         }
         c = a * b;
-        assert(c / a == b);
+        require(c / a == b, "SafeMath mul failed");
         return c;
     }
 
     /**
-    * @dev Integer division of two numbers, truncating the quotient.
-    */
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        // assert(b > 0); // Solidity automatically throws when dividing by 0
-        // uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-        return a / b;
-    }
-
-
-    /**
     * @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
     */
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        assert(b <= a);
+    function sub(uint256 a, uint256 b)
+    internal
+    pure
+    returns (uint256)
+    {
+        require(b <= a, "SafeMath sub failed");
         return a - b;
     }
 
     /**
     * @dev Adds two numbers, throws on overflow.
     */
-    function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
+    function add(uint256 a, uint256 b)
+    internal
+    pure
+    returns (uint256 c)
+    {
         c = a + b;
-        assert(c >= a);
+        require(c >= a, "SafeMath add failed");
         return c;
     }
-
 }
-
 
 /**
  * @title Ownable
@@ -60,14 +62,13 @@ contract Ownable {
     address public wallet;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-    event WalletUpdate(address indexed newWallet);
-
+    event WalletChanged(address indexed newWallet);
 
     /**
      * @dev The Ownable constructor sets the original `owner` of the contract to the sender
      * account.
      */
-    function Ownable() public {
+    constructor () public {
         owner = msg.sender;
         wallet = msg.sender;
     }
@@ -93,7 +94,7 @@ contract Ownable {
 
     function setWallet(address newWallet) public onlyOwner {
         require(newWallet != address(0));
-        emit WalletUpdate(newWallet);
+        emit WalletChanged(newWallet);
         wallet = newWallet;
     }
 
@@ -108,16 +109,16 @@ interface ERC20 {
 }
 
 
-contract CoinMarket is Ownable {
-
+contract ZeroDelta is Ownable {
     using SafeMath for uint;
+
+    string constant public name = "ZeroDelta";
+    string constant public symbol = "ZD";
 
     uint public fee; // percentage times (1 ether)
     bool private depositingTokenFlag; // True when Token.transferFrom is being called from depositToken
-    mapping (address => mapping (address => uint)) public tokens; // mapping of token addresses to mapping of account balances (token=0 means Ether)
-    mapping (address => mapping (bytes32 => uint)) public orderFills; // mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
-    // mapping (address => bool) public tokensWithoutFee;
-    // mapping (address => bool) public tokensListed;
+    mapping(address => mapping(address => uint)) public tokens; // mapping of token addresses to mapping of account balances (token=0 means Ether)
+    mapping(address => mapping(bytes32 => uint)) public orderFills; // mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
 
     address public predecessor; // Address of the previous version of this contract. If address(0), this is the first version
     address public successor; // Address of the next version of this contract. If address(0), this is the most up to date version.
@@ -131,20 +132,20 @@ contract CoinMarket is Ownable {
 
 
     /// Constructor function. This is only called on contract creation.
-    function CoinMarket(uint _fee, address _predecessor) public {
+    constructor (uint _fee, address _predecessor) public {
         fee = _fee;
         depositingTokenFlag = false;
         predecessor = _predecessor;
 
         if (predecessor != address(0)) {
-            version = CoinMarket(predecessor).version() + 1;
+            version = ZeroDelta(predecessor).version() + 1;
         } else {
             version = 1;
         }
     }
 
     /// The fallback function. Ether transfered into the contract is not accepted.
-    function() public {
+    function() public payable {
         revert();
     }
 
@@ -152,14 +153,6 @@ contract CoinMarket is Ownable {
     function setFee(uint _fee) external onlyOwner {
         fee = _fee;
     }
-
-    // function setTokenWithoutFee(address _token, bool _isFee) external onlyOwner {
-    //     tokensWithoutFee[_token] = _isFee;
-    // }
-
-    // function setTokenListed(address _token, bool _isListed) external onlyOwner {
-    //     tokensListed[_token] = _isListed;
-    // }
 
     /// Changes the successor. Used in updating the contract.
     function setSuccessor(address _successor) external onlyOwner {
@@ -229,6 +222,10 @@ contract CoinMarket is Ownable {
             // with direct transfers of ECR20 and ETH.
             revert();
         }
+        //just silence compiler
+        sender;
+        amount;
+        data;
     }
 
     /**
@@ -282,17 +279,15 @@ contract CoinMarket is Ownable {
     * @param amount uint amount in terms of tokenGet that will be "buy" in the trade
     */
     function trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount) external {
-        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
+        bytes32 hash = sha256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
         require(
-            ecrecover(keccak256(keccak256("bytes32 Order hash"), keccak256(hash)), v, r, s) == user &&
+            ecrecover(keccak256(abi.encodePacked(keccak256("bytes32 Order hash"), keccak256(abi.encodePacked(hash)))), v, r, s) == user &&
             block.number <= expires &&
             orderFills[user][hash].add(amount) <= amountGet
         );
-        uint amountCalc =  tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
-        //                        tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
+        uint amountCalc = tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
         orderFills[user][hash] = orderFills[user][hash].add(amount);
         emit Trade(hash, tokenGet, amount, tokenGive, amountCalc, user, msg.sender);
-        //        emit Trade(tokenGet, amount, tokenGive, amountGive.mul(amount) / amountGet, user, msg.sender);
     }
 
     /**
@@ -309,16 +304,11 @@ contract CoinMarket is Ownable {
     * @param user Ethereum address of the user who placed the order
     * @param amount uint amount in terms of tokenGet that will be "buy" in the trade
     */
-    function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) private returns(uint amountCalc) {
+    function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) private returns (uint amountCalc) {
+        uint _feeGet = amount.mul(fee) / 1 ether;
 
-        uint _feeGet = amount.mul(fee).div(1 ether);
-
-        // if (!tokensWithoutFee[tokenGet]) {
-        //     _fee = amount.mul(fee).div(1 ether);
-        // }
-
-        amountCalc = amountGive.mul(amount).div(amountGet);
-        uint _feeGive = amountCalc.mul(fee).div(1 ether);
+        amountCalc = amountGive.mul(amount) / amountGet;
+        uint _feeGive = amountCalc.mul(fee) / 1 ether;
 
         tokens[tokenGet][msg.sender] = tokens[tokenGet][msg.sender].sub(amount);
         tokens[tokenGive][user] = tokens[tokenGive][user].sub(amountCalc);
@@ -348,7 +338,7 @@ contract CoinMarket is Ownable {
     * @param sender Ethereum address of the user taking the order
     * @return bool: true if the trade would be successful, false otherwise
     */
-    function testTrade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount, address sender) external view returns(bool) {
+    function testTrade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount, address sender) external view returns (bool) {
         if (!(
         tokens[tokenGet][sender] >= amount &&
         availableVolume(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, user, v, r, s) >= amount
@@ -374,9 +364,9 @@ contract CoinMarket is Ownable {
     * @param s part of signature for the order hash as signed by user
     * @return uint: amount of volume available for the given order in terms of amountGet / tokenGet
     */
-    function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
-        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-        if (!(ecrecover(keccak256(keccak256("bytes32 Order hash"), keccak256(hash)), v, r, s) == user && block.number <= expires)) {
+    function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s) public view returns (uint) {
+        bytes32 hash = sha256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
+        if (!(ecrecover(keccak256(abi.encodePacked(keccak256("bytes32 Order hash"), keccak256(abi.encodePacked(hash)))), v, r, s) == user && block.number <= expires)) {
             return 0;
         }
         uint[2] memory available;
@@ -404,9 +394,13 @@ contract CoinMarket is Ownable {
     * @param s part of signature for the order hash as signed by user
     * @return uint: amount of the given order that has already been filled in terms of amountGet / tokenGet
     */
-    function amountFilled(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
-        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
+    function amountFilled(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s) public view returns (uint) {
+        bytes32 hash = sha256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
         return orderFills[user][hash];
+        //just silence compiler
+        v;
+        r;
+        s;
     }
 
 
@@ -424,7 +418,7 @@ contract CoinMarket is Ownable {
 
         require(newContract != address(0));
 
-        CoinMarket newExchange = CoinMarket(newContract);
+        ZeroDelta newExchange = ZeroDelta(newContract);
 
         // Move Ether into new exchange.
         uint etherAmount = tokens[0][msg.sender];
@@ -436,7 +430,8 @@ contract CoinMarket is Ownable {
         // Move Tokens into new exchange.
         for (uint16 n = 0; n < tokens_.length; n++) {
             address token = tokens_[n];
-            require(token != address(0)); // Ether is handled above.
+            require(token != address(0));
+            // Ether is handled above.
             uint tokenAmount = tokens[token][msg.sender];
 
             if (tokenAmount != 0) {
