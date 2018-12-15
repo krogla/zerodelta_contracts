@@ -91,7 +91,9 @@ contract Ownable {
         owner = newOwner;
     }
 
-
+    /**
+    * @dev Set wallet address.
+    */
     function setWallet(address newWallet) public onlyOwner {
         require(newWallet != address(0));
         emit WalletChanged(newWallet);
